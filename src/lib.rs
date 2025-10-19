@@ -6,13 +6,14 @@ pub struct Lwst {
 	pub encoding: EncodingType,
 	pub compression: Option<CompressionKind>,
 	pub simple_font_table: bool,
-	pub software_color: bool,
 	pub software_pos: bool,
+	pub software_color: bool,
 	pub software_font: bool,
 	pub color_table: Option<Vec<ColorTableEntry>>,
 	pub pos_table: Option<Vec<PosTableEntry>>,
 	pub font_table: Option<FontTable>,
 	pub subtitle_table: Vec<String>,
+	pub timing_array: TimingArray,
 }
 
 #[derive(Error, Debug)]
@@ -25,6 +26,8 @@ pub enum LwstError {
 	IllegalValue,
 	#[error("utf-8 error: {0}")]
 	Utf8(#[from] std::string::FromUtf8Error),
+	#[error("error while making timestamp")]
+	TimestampMake,
 }
 
 #[derive(Debug)]
@@ -77,6 +80,33 @@ pub struct PosTableEntry {
 	pub x_attachment_point: u8,
 	pub y_attachment_point: u8,
 	pub max_box_width: Option<u8>,
+}
+
+#[derive(Debug)]
+pub struct Timestamp([u8; 3]);
+
+// impl Timestamp {
+// 	fn new(val: u32) -> Result<Self, LwstError> {
+// 		if val < 1<<24 {
+// 			Ok(Timestamp([(val >> 16) as u8, (val >> 8) as u8, val as u8]))
+// 		} else {
+// 			Err(LwstError::TimestampMake)
+// 		}
+// 	}
+//
+// 	fn destruct(&self) -> u32 {
+// 		(self.0[0] as u32) << 16 | (self.0[1] as u32) << 8 | self.0[2] as u32
+// 	}
+// }
+
+#[derive(Debug)]
+pub struct TimingArray {
+	pub pos_ix_vec: Option<Vec<u8>>,
+	pub color_ix_vec: Option<Vec<u8>>,
+	pub font_ix_vec: Option<Vec<u8>>,
+	pub subtitle_ix_vec: Vec<u16>,
+	pub timestamp_vec: Vec<Timestamp>,
+	pub len: usize,
 }
 
 macro_rules! next {
@@ -134,7 +164,6 @@ impl Lwst {
 			let mut pos_table: Vec<PosTableEntry> = vec![];
 			for _ix in 0..pos_table_len {
 				let anchor_point = *next!(iter);
-				println!("{}", anchor_point);
 				let anchor_point = if anchor_point > 8 {
 					return Err(LwstError::IllegalValue);
 				} else {
@@ -145,7 +174,6 @@ impl Lwst {
 				let y_attachment_point = *next!(iter);
 				let max_box_width = iter.next().copied();
 				let entry = PosTableEntry { anchor_point, x_attachment_point, y_attachment_point, max_box_width };
-				println!("{:#?}", entry);
 				pos_table.push(entry);
 			};
 
@@ -185,7 +213,50 @@ impl Lwst {
 				let sub = String::from_utf8(iter.by_ref().take_while(|&&b| b != 0x00).copied().collect())?;
 				vec.push(sub);
 			}
+			iter.next();
 			vec
+		};
+
+		println!("======= sub table =======\n{:#?}", subtitle_table);
+		let timing_array = {
+			let mut pos_vec = vec![];
+			let mut color_vec = vec![];
+			let mut font_vec = vec![];
+			let mut timestamp_vec = vec![];
+			let mut sub_vec = vec![];
+			while iter.peek() != None {
+				println!("\n\n======================\n{:#?}\n{:#?}\n{:#?}\n{:#?}\n", pos_vec, color_vec, font_vec, timestamp_vec);
+				if !software_pos {
+					pos_vec.push(*next!(iter));
+				}
+				if !software_color {
+					color_vec.push(*next!(iter));
+				}
+				if !software_font {
+					font_vec.push(*next!(iter));
+				}
+				timestamp_vec.push(Timestamp {
+					0: [*next!(iter), *next!(iter), *next!(iter)]
+				});
+				sub_vec.push(u16::from_le_bytes([*next!(iter), *next!(iter)]));
+			};
+			let pos_vec = if software_pos {
+				None
+			} else {
+				Some(pos_vec)
+			};
+			let color_vec = if software_color {
+				None
+			} else {
+				Some(color_vec)
+			};
+			let font_vec = if software_font {
+				None
+			} else {
+				Some(font_vec)
+			};
+			let len = sub_vec.len();
+			TimingArray { pos_ix_vec: pos_vec, color_ix_vec: color_vec, font_ix_vec: font_vec, subtitle_ix_vec: sub_vec, timestamp_vec, len }
 		};
 
 		Ok(Lwst {
@@ -193,13 +264,14 @@ impl Lwst {
 			encoding,
 			compression,
 			simple_font_table,
-			software_color,
 			software_pos,
+			software_color,
 			software_font,
 			color_table,
 			pos_table,
 			font_table,
 			subtitle_table,
+			timing_array,
 		})
 	}
 }

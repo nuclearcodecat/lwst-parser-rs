@@ -14,9 +14,9 @@ bytes = bytearray([
     0x00,
     # simple font table disabled (names + weight instead of indices for mcu)
     0x00,
-    # no software-defined color
-    0x00,
     # no software-defined position
+    0x00,
+    # no software-defined color
     0x00,
     # no software-defined font
     0x00,
@@ -84,11 +84,9 @@ bytes = bytearray([
     # font index: 0
     0x00,
     # time stamp, 100ms in, litte endian
-    0x64, 0x00, 0x00, 0x00,
+    0x64, 0x00, 0x00,
     # subtitle 1, hello lwst
-    0x00,
-    # end of subtitle
-    0x00,
+    0x00, 0x00,
     # == timing entry 2
     # pos index: 1, right
     0x01,
@@ -97,11 +95,9 @@ bytes = bytearray([
     # font index: 0
     0x00,
     # time stamp, 1100ms in, litte endian
-    0x4c, 0x04, 0x00, 0x00,
+    0x4c, 0x04, 0x00,
     # subtitle 2, i'm white
-    0x01,
-    # end of subtitle
-    0x00,
+    0x01, 0x00,
 ])
 
 with open("sub.lwst", "wb") as file:

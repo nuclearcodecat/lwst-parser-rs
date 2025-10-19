@@ -3,4 +3,13 @@ name = "lwst-parser"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "lwst"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lwst_parser"
+path = "src/bin.rs"
+
 [dependencies]
+thiserror = "2.0.17"
